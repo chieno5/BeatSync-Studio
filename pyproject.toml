@@ -15,6 +15,10 @@ dependencies = [
   "opencv-python-headless>=4.10,<5",
 ]
 
+[project.urls]
+Homepage = "https://github.com/chieno5/BeatSync-Studio"
+Issues = "https://github.com/chieno5/BeatSync-Studio/issues"
+
 [project.optional-dependencies]
 anime = ["onnxruntime>=1.18,<2"]
 online = ["yt-dlp>=2026.1.29"]

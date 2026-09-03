@@ -11,7 +11,7 @@
 ### Windows
 
 ```powershell
-git clone <项目地址>
+git clone https://github.com/chieno5/BeatSync-Studio.git
 cd "BeatSync Studio"
 .\scripts\setup.ps1
 .\.venv\Scripts\beatsync.exe doctor
@@ -26,7 +26,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
 ### macOS / Linux
 
 ```bash
-git clone <项目地址>
+git clone https://github.com/chieno5/BeatSync-Studio.git
 cd "BeatSync Studio"
 bash scripts/setup.sh
 ./.venv/bin/beatsync doctor
