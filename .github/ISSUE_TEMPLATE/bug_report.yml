@@ -1,0 +1,35 @@
+name: Bug 报告
+description: 报告可复现的问题
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: 请勿上传私人照片、未授权视频、Cookie 或访问令牌。
+  - type: textarea
+    id: problem
+    attributes:
+      label: 问题描述
+      description: 实际发生了什么？你原本期待什么？
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      description: 请提供最小复现步骤和执行命令。
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: beatsync doctor 输出
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 错误信息或日志
+      render: text
+

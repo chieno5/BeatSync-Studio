@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "beatsync-studio"
+version = "0.1.0"
+description = "Search videos for a target face and export matching time ranges."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+  "imageio-ffmpeg>=0.6,<1",
+  "numpy>=1.26,<3",
+  "opencv-python-headless>=4.10,<5",
+]
+
+[project.optional-dependencies]
+anime = ["onnxruntime>=1.18,<2"]
+online = ["yt-dlp>=2026.1.29"]
+dev = ["pytest>=8.2,<9", "ruff>=0.6,<1"]
+
+[project.scripts]
+beatsync = "beatsync_studio.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

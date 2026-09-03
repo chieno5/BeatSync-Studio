@@ -1,0 +1,33 @@
+name: 功能建议
+description: 建议一个清晰、有限的新能力
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: use_case
+    attributes:
+      label: 使用场景
+      description: 你遇到了什么问题？这个功能会怎样帮助你？
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 建议方案
+      description: 描述输入、期望输出和最小可用范围。
+    validations:
+      required: true
+  - type: dropdown
+    id: stage
+    attributes:
+      label: 所属方向
+      options:
+        - 本地人物检索
+        - Bilibili 在线来源
+        - 识别准确率与性能
+        - 素材管理与导出
+        - 后续剪辑分析
+        - 其他
+    validations:
+      required: true
+
