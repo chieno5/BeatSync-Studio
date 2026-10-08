@@ -28,6 +28,9 @@ def _add_scan_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--max-frame-width", type=int, default=640)
     parser.add_argument("--clip-mode", choices=("accurate", "copy"), default="accurate")
     parser.add_argument("--no-export", action="store_true")
+    parser.add_argument("--no-cache", action="store_true")
+    parser.add_argument("--refine-interval", type=float)
+    parser.add_argument("--refine-window", type=float, default=4.0)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -56,6 +59,10 @@ def _options(args: argparse.Namespace) -> ScanOptions:
         raise ValueError("--threshold must be between 0 and 1")
     if args.sample_interval <= 0 or args.max_gap < 0 or args.padding < 0:
         raise ValueError("Sampling interval must be positive; gap and padding cannot be negative")
+    if args.refine_interval is not None and not 0 < args.refine_interval <= args.sample_interval:
+        raise ValueError("--refine-interval must be positive and no larger than --sample-interval")
+    if args.refine_window < 0:
+        raise ValueError("--refine-window cannot be negative")
     if args.max_frame_width < 128:
         raise ValueError("--max-frame-width must be at least 128")
     return ScanOptions(
@@ -66,6 +73,9 @@ def _options(args: argparse.Namespace) -> ScanOptions:
         max_frame_width=args.max_frame_width,
         clip_mode=args.clip_mode,
         export=not args.no_export,
+        cache=not args.no_cache,
+        refine_interval=args.refine_interval,
+        refine_window=args.refine_window,
     )
 
 

@@ -20,6 +20,9 @@ class ScanOptions:
     max_frame_width: int = 640
     clip_mode: str = "accurate"
     export: bool = True
+    cache: bool = True
+    refine_interval: float | None = None
+    refine_window: float = 4.0
 
 
 def process_video(
@@ -42,6 +45,9 @@ def process_video(
         max_gap=options.max_gap,
         padding=options.padding,
         max_frame_width=options.max_frame_width,
+        cache_path=output_dir / "work" / "analysis.sqlite3" if options.cache else None,
+        refine_interval=options.refine_interval,
+        refine_window=options.refine_window,
         progress_callback=progress_callback,
     )
     effective_master = master_path or analyzed_path
@@ -84,6 +90,9 @@ def write_manifest(output_dir: Path, results: list[VideoResult], options: ScanOp
             "max_frame_width": options.max_frame_width,
             "clip_mode": options.clip_mode,
             "export": options.export,
+            "cache": options.cache,
+            "refine_interval": options.refine_interval,
+            "refine_window": options.refine_window,
         },
         "summary": {
             "videos": len(results),

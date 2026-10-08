@@ -12,7 +12,7 @@
 
 ```powershell
 git clone https://github.com/chieno5/BeatSync-Studio.git
-cd "BeatSync Studio"
+cd BeatSync-Studio
 .\scripts\setup.ps1
 .\.venv\Scripts\beatsync.exe doctor
 ```
@@ -27,7 +27,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
 
 ```bash
 git clone https://github.com/chieno5/BeatSync-Studio.git
-cd "BeatSync Studio"
+cd BeatSync-Studio
 bash scripts/setup.sh
 ./.venv/bin/beatsync doctor
 ```
@@ -116,3 +116,26 @@ output/
 请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。Bug 报告最好附上系统信息、`beatsync doctor` 输出以及可公开的最小复现素材；不要上传没有传播权限的视频或人物照片。
 
 完整产品构想见 [PROJECT_IDEA.md](PROJECT_IDEA.md)。项目代码采用 [MIT License](LICENSE)；自动下载的第三方模型和在线媒体仍受其各自许可证、服务条款和内容权利约束。
+
+
+## 分析缓存与精扫
+
+默认在输出目录的 `work/analysis.sqlite3` 保存抽样点原始得分，每完成一个点即提交。
+中断后使用相同输出目录再次运行，会复用已完成点；修改阈值、合并间隔、padding 或导出模式无需重复推理。
+缓存键包含视频 SHA-256、文件大小、引擎实现版本、模型 SHA-256、参考图片合并特征和分析宽度。
+每次启动仍需读取视频计算哈希并初始化模型和参考特征；缓存不会存储视频或图片。
+不同抽样间隔可复用重合时间点。删除该数据库可重置缓存，`--no-cache` 可禁用缓存。
+Bilibili 代理删除后仍需重新下载，内容相同的代理可复用分析；本功能不是下载缓存。
+
+可选两阶段扫描：
+
+```powershell
+beatsync scan-local --reference character.png --engine anime --videos-dir D:\Videos --output-dir output --sample-interval 2 --refine-interval 0.5 --refine-window 4
+```
+
+先按 `--sample-interval` 粗扫，再对命中点前后 `--refine-window` 秒按 `--refine-interval` 精扫。
+重叠窗口和相同时间点去重，片段边界使用精扫间隔估计；精扫间隔必须不大于粗扫间隔。
+粗扫完全漏掉的短镜头无法通过精扫发现，仍需降低粗扫间隔。当前未加入镜头边界分析或跟踪。
+进度百分比仅表示粗扫进度，粗扫 100% 后可能仍在精扫。
+动漫 CCIP 特征支持动态 batch 时每批最多 8 个角色；固定 batch 模型按声明大小分批补齐。
+身份距离计算仍逐角色运行，当前尚无真实视频性能提升量化结果。

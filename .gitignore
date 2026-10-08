@@ -11,3 +11,4 @@ test-output/
 work/
 models/
 test-data/
+pytest-of-*/

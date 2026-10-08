@@ -4,6 +4,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from .cache import AnalysisCache, analysis_key
 from .intervals import merge_match_samples
 from .models import MatchSample, TimeSegment
 
@@ -25,6 +26,9 @@ def scan_video(
     max_gap: float,
     padding: float,
     max_frame_width: int,
+    cache_path: Path | None = None,
+    refine_interval: float | None = None,
+    refine_window: float = 4.0,
     progress_callback: Callable[[int], None] | None = None,
 ) -> tuple[float, int, list[MatchSample], list[TimeSegment]]:
     try:
@@ -42,26 +46,77 @@ def scan_video(
         if duration <= 0:
             raise ValueError(f"Cannot determine video duration: {path}")
 
-        timestamp = 0.0
-        sampled_frames = 0
-        matches: list[MatchSample] = []
-        next_progress = 10
-        while timestamp < duration:
-            capture.set(cv2.CAP_PROP_POS_MSEC, timestamp * 1000.0)
-            ok, frame = capture.read()
-            if not ok:
-                timestamp += sample_interval
-                continue
-            sampled_frames += 1
-            frame = _resize_for_analysis(frame, max_frame_width, cv2)
-            similarity = matcher.best_similarity(frame)
-            if similarity is not None and similarity >= threshold:
-                matches.append(MatchSample(timestamp=round(timestamp, 3), similarity=similarity))
-            timestamp += sample_interval
-            percent = min(100, int(timestamp / duration * 100))
-            if progress_callback is not None and percent >= next_progress:
-                progress_callback(next_progress)
-                next_progress += 10
+        if sample_interval <= 0 or (refine_interval is not None and refine_interval <= 0):
+            raise ValueError("Sampling intervals must be positive")
+        if refine_window < 0:
+            raise ValueError("Refine window cannot be negative")
+        cache = (
+            AnalysisCache(cache_path, analysis_key(path, matcher, max_frame_width))
+            if cache_path is not None
+            else None
+        )
+        try:
+            scores = cache.load() if cache else {}
+            visited: dict[int, tuple[bool, float | None]] = {}
+            next_progress = 10
+
+            def evaluate(timestamp: float) -> None:
+                key = round(timestamp * 1_000_000)
+                if key in visited:
+                    return
+                if key not in scores:
+                    capture.set(cv2.CAP_PROP_POS_MSEC, timestamp * 1000.0)
+                    ok, frame = capture.read()
+                    similarity = (
+                        matcher.best_similarity(_resize_for_analysis(frame, max_frame_width, cv2))
+                        if ok
+                        else None
+                    )
+                    scores[key] = (bool(ok), similarity)
+                    if cache:
+                        cache.save(key, bool(ok), similarity)
+                visited[key] = scores[key]
+
+            index = 0
+            while index * sample_interval < duration:
+                timestamp = index * sample_interval
+                evaluate(timestamp)
+                index += 1
+                percent = min(100, int(index * sample_interval / duration * 100))
+                while progress_callback is not None and percent >= next_progress:
+                    progress_callback(next_progress)
+                    next_progress += 10
+
+            if refine_interval is not None:
+                coarse_hits = [
+                    key / 1_000_000
+                    for key, (_, score) in visited.items()
+                    if score is not None and score >= threshold
+                ]
+                windows: list[list[float]] = []
+                for hit in sorted(coarse_hits):
+                    start, end = max(0.0, hit - refine_window), min(duration, hit + refine_window)
+                    if windows and start <= windows[-1][1]:
+                        windows[-1][1] = max(windows[-1][1], end)
+                    else:
+                        windows.append([start, end])
+                for start, end in windows:
+                    index = 0
+                    while start + index * refine_interval <= end:
+                        timestamp = start + index * refine_interval
+                        if timestamp < duration:
+                            evaluate(timestamp)
+                        index += 1
+
+            sampled_frames = sum(decoded for decoded, _ in visited.values())
+            matches = [
+                MatchSample(timestamp=key / 1_000_000, similarity=score)
+                for key, (_, score) in sorted(visited.items())
+                if score is not None and score >= threshold
+            ]
+        finally:
+            if cache:
+                cache.close()
     finally:
         capture.release()
 
@@ -70,6 +125,6 @@ def scan_video(
         max_gap=max_gap,
         padding=padding,
         duration=duration,
-        sample_interval=sample_interval,
+        sample_interval=refine_interval or sample_interval,
     )
     return duration, sampled_frames, matches, segments

@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+from .cache import file_digest
 from .face import _ensure_model
 
 
@@ -47,6 +48,18 @@ class AnimeCharacterMatcher:
             box = max(boxes, key=lambda item: (item[2] - item[0]) * (item[3] - item[1]))
             embeddings.append(self._feature(image, box))
         self.reference_embedding = self._merge(embeddings)
+        self.cache_identity = {
+            "engine": "anime.py-v1",
+            "models": [
+                file_digest(_ensure_model(name))
+                for name in [
+                    "anime_face_detect_v1.4_n.onnx",
+                    "ccip_caformer2_feat.onnx",
+                    "ccip_caformer2_metrics.onnx",
+                ]
+            ],
+            "embedding": self.reference_embedding.tobytes().hex(),
+        }
 
     def _letterbox(self, image: Any, size: int = 640) -> tuple[Any, float, int, int]:
         height, width = image.shape[:2]
@@ -107,7 +120,7 @@ class AnimeCharacterMatcher:
         bottom = min(image_height, int(y1 + height * 1.8))
         return image[top:bottom, left:right]
 
-    def _feature(self, image: Any, box: tuple[int, int, int, int]) -> Any:
+    def _prepare_feature(self, image: Any, box: tuple[int, int, int, int]) -> Any:
         crop = self._character_crop(image, box)
         rgb = self._cv2.cvtColor(crop, self._cv2.COLOR_BGR2RGB)
         rgb = self._cv2.resize(rgb, (384, 384), interpolation=self._cv2.INTER_AREA)
@@ -115,8 +128,26 @@ class AnimeCharacterMatcher:
         mean = self._np.asarray((0.48145466, 0.4578275, 0.40821073), dtype=self._np.float32)
         std = self._np.asarray((0.26862954, 0.26130258, 0.27577711), dtype=self._np.float32)
         data = (data - mean[:, None, None]) / std[:, None, None]
-        output = self.feature_model.run(None, {self.feature_input: data[None, ...]})[0]
-        return output[0].astype(self._np.float32)
+        return data
+
+    def _features(self, image: Any, boxes: Sequence[tuple[int, int, int, int]]) -> Any:
+        data = self._np.stack([self._prepare_feature(image, box) for box in boxes])
+        batch = self.feature_model.get_inputs()[0].shape[0]
+        # Respect fixed batch models; pad only the final chunk, then discard padding.
+        chunk_size = batch if isinstance(batch, int) and batch > 0 else min(8, len(boxes))
+        outputs = []
+        for start in range(0, len(boxes), chunk_size):
+            chunk = data[start : start + chunk_size]
+            count = len(chunk)
+            if isinstance(batch, int) and count < batch:
+                chunk = self._np.concatenate(
+                    [chunk, self._np.repeat(chunk[-1:], batch - count, axis=0)]
+                )
+            outputs.append(self.feature_model.run(None, {self.feature_input: chunk})[0][:count])
+        return self._np.concatenate(outputs).astype(self._np.float32)
+
+    def _feature(self, image: Any, box: tuple[int, int, int, int]) -> Any:
+        return self._features(image, [box])[0]
 
     def _merge(self, embeddings: Sequence[Any]) -> Any:
         matrix = self._np.stack(embeddings).astype(self._np.float32)
@@ -134,4 +165,4 @@ class AnimeCharacterMatcher:
         boxes = self._detect(frame)
         if not boxes:
             return None
-        return max(self._similarity(self._feature(frame, box)) for box in boxes)
+        return max(self._similarity(feature) for feature in self._features(frame, boxes))

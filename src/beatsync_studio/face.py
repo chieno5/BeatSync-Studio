@@ -6,6 +6,8 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+from .cache import file_digest
+
 MODEL_URLS = {
     "anime_face_detect_v1.4_n.onnx": (
         "https://hub.deepghs.org/deepghs/anime_face_detection/resolve/main/"
@@ -100,6 +102,17 @@ class FaceMatcher:
         self.recognizer = cv2.FaceRecognizerSF.create(str(recognizer_model), "")
         self.providers = ["OpenCV-DNN-CPU"]
         self.reference_embedding = self._build_reference(reference_images)
+        self.cache_identity = {
+            "engine": "face.py-v1",
+            "models": [
+                file_digest(_ensure_model(name))
+                for name in [
+                    "face_detection_yunet_2023mar.onnx",
+                    "face_recognition_sface_2021dec.onnx",
+                ]
+            ],
+            "embedding": self.reference_embedding.tobytes().hex(),
+        }
 
     def _detect(self, image: Any) -> Any:
         height, width = image.shape[:2]
